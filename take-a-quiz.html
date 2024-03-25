@@ -3,9 +3,148 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Take a Quiz</title>
+  <link rel="stylesheet" href="navbar.css">
+  <link rel="stylesheet" href="general.css">
+  <link rel="stylesheet" href="cards.css">
 </head>
-<body>
-  
-</body>
+  <body>
+    <ul class="topnav">
+      <li><a  href="index.html">Home</a></li>
+      <li><a href="add-question.html">Add questions</a></li>
+      <li><a href="make-a-quiz.html">Create a quiz</a></li>
+      <li><a class="active" href="take-a-quiz.html">Take a quiz</a></li>
+      <li class="right"><a href="#about">About</a></li>
+    </ul>
+
+    <div id="quiz-list"></div>
+
+    <div id="score-container" style="display: none;">
+      <h2 id="score"></h2>
+    </div>
+
+    <div id="question-card" class="card" style="display: none;">
+      <img id="question-image" alt="question" style="width:40%">
+      <div class="container">
+        <h4 id="question-title"></h4>
+        <p id="question-description"></p>
+        <form id="question-form">
+        </form>
+      </div>
+      <button onclick="previousQuestion()">Previous</button>
+      <span id="question-number"></span>
+      <button onclick="nextQuestion()">Next</button>
+    </div>
+
+    <script>
+      let host = "http://localhost:8080";
+      let currentQuizQuestions = [];
+      let currentQuestionIndex = 0;
+      let correctAnswers = 0;
+
+      async function fetchQuizzes() {
+        try {
+          const response = await fetch(`${host}/quizzes`);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          const quizzes = await response.json();
+          const quizListContainer = document.getElementById('quiz-list');
+          quizListContainer.innerHTML = '';
+          quizzes.forEach(quiz => {
+            const quizButton = document.createElement('button');
+            quizButton.textContent = `${quiz.title} (${quiz.questions.length} questions)`;
+            quizButton.className = 'quiz-selection-button';
+            quizButton.onclick = () => loadQuizQuestions(quiz.questionIds);
+            quizListContainer.appendChild(quizButton);
+          });
+        } catch (error) {
+          console.error('Could not fetch quizzes:', error);
+        }
+      }
+
+      async function loadQuizQuestions(questionIds) {
+        currentQuizQuestions = [];
+        for (let id of questionIds) {
+          try {
+            const response = await fetch(`${host}/questions/${id}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const question = await response.json();
+            currentQuizQuestions.push(question);
+          } catch (error) {
+            console.error(`Could not fetch question with id ${id}:`, error);
+          }
+        }
+        currentQuestionIndex = 0;
+        displayQuestion();
+      }
+
+      function displayQuestion() {
+        if (currentQuestionIndex >= 0 && currentQuestionIndex < currentQuizQuestions.length) {
+          const question = currentQuizQuestions[currentQuestionIndex];
+          const imageElement = document.getElementById('question-image');
+          const titleElement = document.getElementById('question-title');
+          const descriptionElement = document.getElementById('question-description');
+          const formElement = document.getElementById('question-form');
+
+          imageElement.src = `${host}/questions/${question.id}/image`;
+          titleElement.textContent = `Question ${currentQuestionIndex + 1}`;
+          descriptionElement.textContent = question.description;
+
+          formElement.innerHTML = '';
+          question.choices.forEach((choice, index) => {
+            const label = document.createElement('label');
+            const option = document.createElement('input');
+            option.type = 'radio';
+            option.name = 'answer';
+            option.value = choice;
+            label.appendChild(option);
+            label.append(` ${choice}`);
+            formElement.appendChild(label);
+            formElement.appendChild(document.createElement('br'));
+          });
+
+          document.getElementById('question-number').textContent = `Question ${currentQuestionIndex + 1} out of ${currentQuizQuestions.length}`;
+
+          document.getElementById('question-card').style.display = 'block';
+        }
+      }
+
+      function previousQuestion() {
+        if (currentQuestionIndex > 0) {
+          currentQuestionIndex--;
+          displayQuestion();
+        }
+      }
+
+      function nextQuestion() {
+        if (currentQuestionIndex < currentQuizQuestions.length - 1) {
+          const selectedChoice = document.querySelector('input[name="answer"]:checked').value;
+          checkAnswer(selectedChoice);
+          currentQuestionIndex++;
+          displayQuestion();
+        } else {
+          displayScore();
+        }
+      }
+
+      function checkAnswer(selectedChoice) {
+        const currentQuestion = currentQuizQuestions[currentQuestionIndex];
+        if (selectedChoice === currentQuestion.answer) {
+          correctAnswers++;
+        }
+      }
+
+      function displayScore() {
+        const scoreContainer = document.getElementById('score-container');
+        const scoreElement = document.getElementById('score');
+        const totalQuestions = currentQuizQuestions.length;
+        const scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
+
+        scoreElement.textContent = `Your score: ${correctAnswers} out of ${totalQuestions} (${scorePercentage}%)`;
+        scoreContainer.style.display = 'block';
+        document.getElementById('question-card').style.display = 'none';
+      }
+
+      fetchQuizzes();
+    </script>
+  </body>
 </html>

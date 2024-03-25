@@ -3,9 +3,144 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Make a Quiz</title>
+  <link rel="stylesheet" href="make-a-quiz.css">
+  <link rel="stylesheet" href="navbar.css">
+  <link rel="stylesheet" href="general.css">
+  <link rel="stylesheet" href="cards.css">
 </head>
-<body>
-  
-</body>
+  <body>
+
+    <ul class="topnav">
+      <li><a  href="index.html">Home</a></li>
+      <li><a href="add-question.html">Add questions</a></li>
+      <li><a class="active" href="make-a-quiz.html">Create a quiz</a></li>
+      <li><a href="take-a-quiz.html">Take a quiz</a></li>
+      <li class="right"><a href="#about">About</a></li>
+    </ul>
+
+    <div class="quiz-creator">
+      <div id="question-bank" class="cards"></div>
+      <div id="new-quiz-panel">
+        <input type="text" id="quiz-title" placeholder="Enter quiz title">
+        <button onclick="saveQuiz()">Save your changes</button>
+        <button onclick="saveAndNewQuiz()">Save this quiz and start a new one</button>
+        <div id="selected-questions" class="selected-cards"></div>
+      </div>
+    </div>
+
+    <script>
+      let host = "http://localhost:8080";
+      let questions = [];
+      let selectedQuestions = [];
+      let quizId = null;
+
+      displayTheQuestions();
+
+      async function getAll() {
+        let response = await fetch(host + "/questions");
+        let result = await response.json();
+        return result;
+      }
+
+      async function displayTheQuestions() {
+        if (questions.length == 0) {
+          questions = await getAll();
+        }
+
+        let bank = document.getElementById("question-bank");
+        bank.innerHTML = "";
+
+        questions.forEach(question => {
+          let div = document.createElement("div");
+          div.className = "card";
+          div.onclick = function() { toggleQuestionSelection(question); };
+          let innerHtml = `
+        <img src="${host}/questions/${question.id}/image" alt="question" style="width:100%">
+        <div class="container">
+          <h4><b>Question ${question.id}</b></h4>
+          <p>${question.description}</p>
+        </div>`;
+          div.innerHTML = innerHtml;
+          bank.appendChild(div);
+        });
+      }
+
+      function displaySelectedQuestions() {
+        let panel = document.getElementById("selected-questions");
+        panel.innerHTML = "";
+
+        selectedQuestions.forEach(question => {
+          let card = document.createElement("div");
+          card.className = "card";
+
+          card.innerHTML = `
+            <img src="${host}/questions/${question.id}/image" alt="Question image" style="width:100%">
+            <div class="container">
+                <h4><b>Question ${question.id}</b></h4>
+                <p>${question.description}</p>
+            </div>
+        `;
+
+          card.addEventListener('click', () => {
+            toggleQuestionSelection(question);
+          });
+          panel.appendChild(card);
+        });
+      }
+
+      function toggleQuestionSelection(question) {
+        let index = selectedQuestions.findIndex(q => q.id === question.id);
+        if (index > -1) {
+          selectedQuestions.splice(index, 1);
+        } else {
+          selectedQuestions.push(question);
+        }
+        displaySelectedQuestions();
+      }
+
+      async function saveQuiz() {
+        let title = document.getElementById("quiz-title").value.trim();
+        if (!title) {
+          alert("Please enter a quiz title");
+          return;
+        }
+
+        let questionIds = selectedQuestions.map(q => q.id);
+
+        let quizData = {
+          title: title,
+          questionIds: questionIds
+        };
+
+        let method = quizId ? 'PUT' : 'POST';
+        let endpoint = quizId ? `/quizzes/${quizId}` : '/quizzes';
+
+        try {
+          let response = await fetch(host + endpoint, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(quizData)
+          });
+
+          if (response.ok) {
+            let result = await response.json();
+            alert('Quiz saved successfully!');
+            quizId = quizId || result;
+          } else {
+            console.error('Failed to save the quiz:', response.status);
+            alert('Error saving quiz.');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('An error occurred while saving the quiz.');
+        }
+      }
+
+      async function saveAndNewQuiz() {
+        await saveQuiz();
+        window.location.reload();
+      }
+    </script>
+  </body>
 </html>
